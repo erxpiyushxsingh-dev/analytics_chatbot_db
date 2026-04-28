@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-Mart Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.5);
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --accent-glow: rgba(99, 102, 241, 0.4);
+            --success: #10b981;
+            --error: #ef4444;
+            --user-bubble: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            --bot-bubble: rgba(255, 255, 255, 0.08);
+        }
+
+        body.light-mode {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(0, 0, 0, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+            --text-primary: #1e293b;
+            --text-secondary: rgba(30, 41, 59, 0.7);
+            --text-muted: rgba(30, 41, 59, 0.5);
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --success: #10b981;
+            --error: #ef4444;
+            --user-bubble: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            --bot-bubble: rgba(255, 255, 255, 0.9);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        .header-logo {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 700; color: #fff;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        .header-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        .header-subtitle { font-size: 13px; color: var(--text-muted); margin-left: 12px; }
+        .header-status {
+            margin-left: auto;
+            display: flex; align-items: center; gap: 12px;
+            font-size: 12px; color: var(--text-muted);
+        }
+        .theme-toggle {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .theme-toggle:hover {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        .connection-status {
+            background: var(--glass-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-dot.offline { background: var(--error); box-shadow: 0 0 10px var(--error); }
+
+        /* ── Main Layout ── */
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            padding: 24px;
+            gap: 24px;
+        }
+
+        /* ── Viz Panel (Left, larger) ── */
+        .viz-panel {
+            flex: 1;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--glass-shadow);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .viz-header {
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex; align-items: center; gap: 12px;
+            font-size: 16px; font-weight: 600;
+        }
+        .viz-header .viz-icon { font-size: 20px; }
+        .viz-body {
+            flex: 1;
+            padding: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+        }
+        .viz-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        .viz-placeholder .viz-placeholder-icon { font-size: 64px; margin-bottom: 16px; opacity: 0.3; }
+        .chart-container {
+            width: 100%;
+            max-height: 500px;
+            position: relative;
+        }
+        .chart-type-selector {
+            display: flex; gap: 8px; margin-left: auto;
+        }
+        .chart-type-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .chart-type-btn:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+            background: rgba(99, 102, 241, 0.1);
+            transform: translateY(-2px);
+        }
+        .chart-type-btn.active {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        /* ── Chat Panel (Right, smaller) ── */
+        .chat-panel {
+            width: 450px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--glass-shadow);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .chat-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .chat-header h3 { font-size: 16px; font-weight: 600; }
+        .clear-chat-btn {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .clear-chat-btn:hover {
+            border-color: var(--error);
+            color: var(--error);
+            background: rgba(239, 68, 68, 0.1);
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scroll-behavior: smooth;
+        }
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
+
+        /* ── Message Bubbles ── */
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 90%;
+            animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+        .message.bot { align-self: flex-start; }
+        .message.bot.clickable { cursor: pointer; }
+        .message.bot.clickable:hover .msg-content { border-color: var(--accent); background: rgba(99, 102, 241, 0.05); }
+        .message.bot.clickable .msg-content::after {
+            content: '↻';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .message.bot.clickable:hover .msg-content::after { opacity: 0.5; }
+
+        .msg-avatar {
+            width: 36px; height: 36px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 700; flex-shrink: 0;
+        }
+        .message.user .msg-avatar { background: var(--user-bubble); color: #fff; }
+        .message.bot .msg-avatar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; }
+
+        .msg-content {
+            border-radius: 18px;
+            padding: 14px 18px;
+            line-height: 1.6;
+            font-size: 14px;
+            position: relative;
+        }
+        .message.user .msg-content { background: var(--user-bubble); color: #fff; border-bottom-right-radius: 6px; }
+        .message.bot .msg-content { background: var(--bot-bubble); color: var(--text-primary); border-bottom-left-radius: 6px; border: 1px solid var(--glass-border); }
+
+        .msg-content .sql-badge {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent-hover);
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            margin-top: 10px;
+            cursor: pointer;
+            word-break: break-all;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            transition: all 0.3s;
+        }
+        .msg-content .sql-badge:hover { background: rgba(99, 102, 241, 0.3); transform: scale(1.02); }
+
+        .msg-content .explanation {
+            margin-top: 10px;
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 13px;
+            padding-top: 10px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .msg-content .result-table {
+            margin-top: 12px;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .msg-content .result-table th {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent-hover);
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--glass-border);
+            font-weight: 600;
+        }
+        .msg-content .result-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+        }
+        .msg-content .result-table tr:hover td { background: rgba(255,255,255,0.05); }
+
+        .msg-content .row-count {
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .msg-content .error-text { color: var(--error); }
+
+        /* ── Search Bar ── */
+        .search-bar {
+            background: var(--glass-bg);
+            border-top: 1px solid var(--glass-border);
+            padding: 20px 24px;
+            flex-shrink: 0;
+        }
+        .search-form {
+            display: flex;
+            gap: 12px;
+        }
+        .search-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 14px 20px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .search-input::placeholder { color: var(--text-muted); }
+        .search-input:focus { 
+            border-color: var(--accent); 
+            box-shadow: 0 0 0 4px var(--accent-glow);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .search-btn {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; align-items: center; gap: 8px;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px var(--accent-glow);
+        }
+        .search-btn:active { transform: translateY(0); }
+        .search-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* ── Welcome ── */
+        .welcome {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--text-muted);
+        }
+        .welcome-icon { font-size: 56px; margin-bottom: 20px; opacity: 0.4; }
+        .welcome h2 { color: var(--text-primary); font-size: 22px; margin-bottom: 10px; font-weight: 600; }
+        .welcome p { font-size: 14px; max-width: 300px; margin: 0 auto; line-height: 1.7; }
+
+        /* ── Loading Dots ── */
+        .loading-dots { display: flex; gap: 6px; padding: 8px 0; }
+        .loading-dots span {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--text-muted);
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        /* ── Responsive ── */
+        @media (max-width: 1024px) {
+            .main { flex-direction: column; }
+            .viz-panel { height: 50%; }
+            .chat-panel { width: 100%; height: 50%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-logo">D</div>
+        <span class="header-title">D-Mart Analytics</span>
+        <span class="header-subtitle">AI-Powered Business Intelligence</span>
+        <div class="header-status">
+            <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">
+                <span id="themeIcon">🌙</span>
+                <span id="themeText">Dark</span>
+            </button>
+            <div class="connection-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connected</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+
+        <!-- Visualization Panel (Left, larger) -->
+        <div class="viz-panel">
+            <div class="viz-header">
+                <span class="viz-icon">📊</span>
+                <span>Dashboard</span>
+                <div class="chart-type-selector" id="chartTypeSelector" style="display:none;">
+                    <button class="chart-type-btn active" data-type="auto" onclick="switchChart(this)">Auto</button>
+                    <button class="chart-type-btn" data-type="bar" onclick="switchChart(this)">Bar</button>
+                    <button class="chart-type-btn" data-type="line" onclick="switchChart(this)">Line</button>
+                    <button class="chart-type-btn" data-type="pie" onclick="switchChart(this)">Pie</button>
+                </div>
+            </div>
+            <div class="viz-body" id="vizBody">
+                <div class="viz-placeholder">
+                    <div class="viz-placeholder-icon">📈</div>
+                    <p>Ask questions about sales, products, areas, and branches<br/>Visualizations will appear here</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Panel (Right, smaller) -->
+        <div class="chat-panel">
+            <div class="chat-header">
+                <h3>💬 Chat History</h3>
+                <button class="clear-chat-btn" onclick="clearChat()">Clear History</button>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome" id="welcome">
+                    <div class="welcome-icon">🛒</div>
+                    <h2>D-Mart Analytics</h2>
+                    <p>Ask anything about your retail data — sales by area, top products, branch performance, and more. Your chat history is saved automatically.</p>
+                </div>
+            </div>
+
+            <div class="search-bar">
+                <form class="search-form" onsubmit="handleSubmit(event)">
+                    <input
+                        type="text"
+                        class="search-input"
+                        id="queryInput"
+                        placeholder="Ask about sales, products, areas…"
+                        autocomplete="off"
+                    />
+                    <button type="submit" class="search-btn" id="submitBtn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        Send
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api/v1/query';
+        const STORAGE_KEY = 'dmart_chat_history';
+        const THEME_KEY = 'dmart_theme';
+        let currentChart = null;
+        let lastResult = null;
+        let lastQuestion = '';
+
+        // ── Theme Toggle ──
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            document.getElementById('themeIcon').textContent = isLight ? '☀️' : '🌙';
+            document.getElementById('themeText').textContent = isLight ? 'Light' : 'Dark';
+            localStorage.setItem(THEME_KEY, isLight ? 'light' : 'dark');
+        }
+
+        function loadTheme() {
+            const saved = localStorage.getItem(THEME_KEY);
+            if (saved === 'light') {
+                document.body.classList.add('light-mode');
+                document.getElementById('themeIcon').textContent = '☀️';
+                document.getElementById('themeText').textContent = 'Light';
+            }
+        }
+
+        // ── Chat History Persistence ──
+        function saveChatHistory(messages) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+        }
+
+        function loadChatHistory() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch {
+                    return [];
+                }
+            }
+            return [];
+        }
+
+        function clearChat() {
+            localStorage.removeItem(STORAGE_KEY);
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = `
+                <div class="welcome" id="welcome">
+                    <div class="welcome-icon">🛒</div>
+                    <h2>D-Mart Analytics</h2>
+                    <p>Ask anything about your retail data — sales by area, top products, branch performance, and more. Your chat history is saved automatically.</p>
+                </div>
+            `;
+            lastResult = null;
+            lastQuestion = '';
+            resetViz();
+        }
+
+        function resetViz() {
+            document.getElementById('vizBody').innerHTML = `
+                <div class="viz-placeholder">
+                    <div class="viz-placeholder-icon">📈</div>
+                    <p>Ask questions about sales, products, areas, and branches<br/>Visualizations will appear here</p>
+                </div>
+            `;
+            document.getElementById('chartTypeSelector').style.display = 'none';
+            if (currentChart) {
+                currentChart.destroy();
+                currentChart = null;
+            }
+        }
+
+        // ── Load chat history on startup ──
+        function loadAndRenderHistory() {
+            const history = loadChatHistory();
+            if (history.length > 0) {
+                document.getElementById('welcome').remove();
+                const container = document.getElementById('chatMessages');
+                history.forEach(msg => {
+                    addMessageToDOM(msg.role, msg.html, false, msg.chartData);
+                });
+                // Restore last chart if available
+                if (history.length > 0) {
+                    const lastMsg = history[history.length - 1];
+                    if (lastMsg.role === 'bot' && lastMsg.chartData) {
+                        renderChart(lastMsg.chartData);
+                        document.getElementById('chartTypeSelector').style.display = 'flex';
+                    }
+                }
+            }
+        }
+
+        function addMessageToDOM(role, html, animate = true, chartData = null) {
+            const welcome = document.getElementById('welcome');
+            if (welcome) welcome.remove();
+
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            if (role === 'bot' && chartData) {
+                div.classList.add('clickable');
+                div.onclick = () => {
+                    renderChart(chartData);
+                    document.getElementById('chartTypeSelector').style.display = 'flex';
+                };
+            }
+            if (!animate) div.style.animation = 'none';
+            const avatar = role === 'user' ? 'U' : 'AI';
+            div.innerHTML = `
+                <div class="msg-avatar">${avatar}</div>
+                <div class="msg-content">${html}</div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addMessage(role, html, isLoading = false, chartData = null) {
+            addMessageToDOM(role, html, true);
+            
+            // Save to history
+            const history = loadChatHistory();
+            history.push({ role, html, chartData });
+            saveChatHistory(history);
+        }
+
+        // ── Health Check ──
+        async function checkHealth() {
+            try {
+                const res = await fetch('/api/v1/health');
+                const data = await res.json();
+                const dot = document.getElementById('statusDot');
+                const text = document.getElementById('statusText');
+                if (data.database === 'connected') {
+                    dot.className = 'status-dot';
+                    text.textContent = 'Connected';
+                } else {
+                    dot.className = 'status-dot offline';
+                    text.textContent = 'DB Disconnected';
+                }
+            } catch {
+                document.getElementById('statusDot').className = 'status-dot offline';
+                document.getElementById('statusText').textContent = 'Offline';
+            }
+        }
+        checkHealth();
+
+        // ── Submit Handler ──
+        async function handleSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('queryInput');
+            const question = input.value.trim();
+            if (!question) return;
+
+            input.value = '';
+            addMessage('user', escapeHtml(question));
+            addMessage('bot', '<div class="loading-dots"><span></span><span></span><span></span></div>', true);
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        chart_type: getSelectedChartType(),
+                        include_explanation: true,
+                    }),
+                });
+                const data = await res.json();
+                removeLoading();
+                renderBotResponse(data);
+                lastResult = data;
+                lastQuestion = question;
+            } catch (err) {
+                removeLoading();
+                addMessage('bot', `<span class="error-text">Request failed: ${escapeHtml(err.message)}</span>`);
+            } finally {
+                btn.disabled = false;
+                input.focus();
+            }
+        }
+
+        function removeLoading() {
+            const container = document.getElementById('chatMessages');
+            const loading = container.querySelector('.loading-dots');
+            if (loading) {
+                const msg = loading.closest('.message');
+                if (msg) msg.remove();
+            }
+        }
+
+        function renderBotResponse(data) {
+            let html = '';
+
+            if (data.status === 'success') {
+                // SQL badge
+                html += `<div class="sql-badge" title="Click to copy" onclick="copySQL(this)">${escapeHtml(data.sql)}</div>`;
+
+                // Explanation
+                if (data.explanation) {
+                    html += `<div class="explanation">💡 ${escapeHtml(data.explanation)}</div>`;
+                }
+
+                // Result table
+                if (data.rows && data.rows.length > 0) {
+                    html += buildTable(data.columns, data.rows);
+                    html += `<div class="row-count">${data.row_count} row${data.row_count !== 1 ? 's' : ''} returned</div>`;
+                }
+
+                // Render chart
+                if (data.chart) {
+                    renderChart(data.chart);
+                    document.getElementById('chartTypeSelector').style.display = 'flex';
+                    // Update last message in history with chart data
+                    const history = loadChatHistory();
+                    if (history.length > 0) {
+                        history[history.length - 1].chartData = data.chart;
+                        saveChatHistory(history);
+                    }
+                }
+            } else {
+                html += `<span class="error-text">❌ ${escapeHtml(data.error || 'Unknown error')}</span>`;
+                if (data.validation_errors) {
+                    html += `<ul style="margin-top:10px;font-size:12px;color:var(--text-muted);padding-left:20px;">${data.validation_errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
+                }
+            }
+
+            addMessage('bot', html, false, data.chart);
+        }
+
+        function buildTable(columns, rows) {
+            const maxRows = 10;
+            const displayRows = rows.slice(0, maxRows);
+            let html = '<table class="result-table"><thead><tr>';
+            columns.forEach(c => html += `<th>${escapeHtml(c)}</th>`);
+            html += '</tr></thead><tbody>';
+            displayRows.forEach(row => {
+                html += '<tr>';
+                columns.forEach(c => {
+                    const val = row[c];
+                    html += `<td>${val !== null && val !== undefined ? escapeHtml(String(val)) : '<em>null</em>'}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            if (rows.length > maxRows) {
+                html += `<div class="row-count">Showing ${maxRows} of ${rows.length} rows</div>`;
+            }
+            return html;
+        }
+
+        // ── Chart Rendering ──
+        function renderChart(chartData) {
+            if (!chartData || !chartData.datasets) return;
+
+            const vizBody = document.getElementById('vizBody');
+            vizBody.innerHTML = '<div class="chart-container"><canvas id="resultChart"></canvas></div>';
+
+            const ctx = document.getElementById('resultChart').getContext('2d');
+
+            if (currentChart) currentChart.destroy();
+
+            const type = chartData.chart_type;
+            const datasets = chartData.datasets.map(ds => ({
+                ...ds,
+                borderWidth: 2,
+                borderRadius: 8,
+                tension: 0.4,
+            }));
+
+            // Enhanced colors
+            const colors = [
+                'rgba(99, 102, 241, 0.8)',
+                'rgba(139, 92, 246, 0.8)',
+                'rgba(16, 185, 129, 0.8)',
+                'rgba(245, 158, 11, 0.8)',
+                'rgba(239, 68, 68, 0.8)',
+                'rgba(236, 72, 153, 0.8)',
+                'rgba(14, 165, 233, 0.8)',
+                'rgba(168, 162, 158, 0.8)',
+            ];
+
+            if (type === 'pie' || type === 'doughnut') {
+                datasets[0].backgroundColor = colors;
+                datasets[0].borderColor = 'rgba(255, 255, 255, 0.2)';
+            } else {
+                datasets[0].backgroundColor = 'rgba(99, 102, 241, 0.6)';
+                datasets[0].borderColor = 'rgba(99, 102, 241, 1)';
+            }
+
+            const config = {
+                type: type === 'scatter' ? 'scatter' : type,
+                data: {
+                    labels: chartData.labels || [],
+                    datasets: datasets,
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: type === 'pie',
+                            position: 'bottom',
+                            labels: { 
+                                color: 'rgba(255, 255, 255, 0.8)', 
+                                font: { size: 12, family: 'Inter' },
+                                padding: 20,
+                                usePointStyle: true,
+                            },
+                        },
+                        title: {
+                            display: !!chartData.title,
+                            text: chartData.title || '',
+                            color: '#ffffff',
+                            font: { size: 18, weight: '600', family: 'Inter' },
+                            padding: { bottom: 20 },
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 12, 41, 0.9)',
+                            titleColor: '#ffffff',
+                            bodyColor: 'rgba(255, 255, 255, 0.8)',
+                            borderColor: 'rgba(99, 102, 241, 0.5)',
+                            borderWidth: 1,
+                            cornerRadius: 12,
+                            padding: 12,
+                        },
+                    },
+                    scales: type === 'pie' ? {} : {
+                        x: {
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        },
+                        y: {
+                            ticks: { color: 'rgba(255, 255, 255, 0.7)', font: { size: 11 } },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            beginAtZero: true,
+                        },
+                    },
+                },
+            };
+
+            currentChart = new Chart(ctx, config);
+        }
+
+        // ── Chart Type Switching ──
+        function getSelectedChartType() {
+            const active = document.querySelector('.chart-type-btn.active');
+            return active ? active.dataset.type : 'auto';
+        }
+
+        function switchChart(btn) {
+            document.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            if (lastResult && lastResult.status === 'success' && lastResult.rows) {
+                const type = btn.dataset.type;
+                if (type === 'auto') {
+                    renderChart(lastResult.chart);
+                } else {
+                    requeryWithChartType(type);
+                }
+            }
+        }
+
+        async function requeryWithChartType(type) {
+            if (!lastQuestion) return;
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: lastQuestion,
+                        chart_type: type,
+                        include_explanation: false,
+                    }),
+                });
+                const data = await res.json();
+                if (data.chart) renderChart(data.chart);
+            } catch {}
+        }
+
+        // ── Helpers ──
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function copySQL(el) {
+            navigator.clipboard.writeText(el.textContent).then(() => {
+                const orig = el.textContent;
+                el.textContent = '✓ Copied!';
+                setTimeout(() => el.textContent = orig, 1500);
+            });
+        }
+
+        // Initialize
+        loadTheme();
+        loadAndRenderHistory();
+        document.getElementById('queryInput').focus();
+    </script>
+</body>
+</html>
